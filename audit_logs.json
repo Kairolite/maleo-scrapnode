@@ -1,0 +1,198 @@
+[
+    {
+        "app_name": "Maleo ScrapNode",
+        "session_id": "20260907_143154",
+        "unique_items_logged": 10,
+        "detections": [
+            {
+                "track_id": 2,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:30:00"
+            },
+            {
+                "track_id": 5,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:30:10"
+            },
+            {
+                "track_id": 8,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:30:28"
+            },
+            {
+                "track_id": 9,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:30:38"
+            },
+            {
+                "track_id": 12,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:30:54"
+            },
+            {
+                "track_id": 13,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:31:08"
+            },
+            {
+                "track_id": 14,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:31:10"
+            },
+            {
+                "track_id": 15,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:31:14"
+            },
+            {
+                "track_id": 17,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:31:34"
+            },
+            {
+                "track_id": 18,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:31:38"
+            }
+        ]
+    },
+    {
+        "app_name": "Maleo ScrapNode",
+        "session_id": "20260907_143813",
+        "unique_items_logged": 6,
+        "detections": [
+            {
+                "track_id": 2,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:37:11"
+            },
+            {
+                "track_id": 3,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:37:14"
+            },
+            {
+                "track_id": 6,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:37:25"
+            },
+            {
+                "track_id": 10,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:37:34"
+            },
+            {
+                "track_id": 11,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:37:34"
+            },
+            {
+                "track_id": 14,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:37:40"
+            }
+        ]
+    },
+    {
+        "app_name": "Maleo ScrapNode",
+        "session_id": "20260907_144337",
+        "unique_items_logged": 5,
+        "detections": [
+            {
+                "track_id": 1,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:42:58"
+            },
+            {
+                "track_id": 2,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:42:59"
+            },
+            {
+                "track_id": 5,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:43:09"
+            },
+            {
+                "track_id": 7,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:43:15"
+            },
+            {
+                "track_id": 9,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:43:28"
+            }
+        ]
+    },
+    {
+        "app_name": "Maleo ScrapNode",
+        "session_id": "20260907_145110",
+        "unique_items_logged": 7,
+        "detections": [
+            {
+                "track_id": 1,
+                "material": "Plastic",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:50:16"
+            },
+            {
+                "track_id": 5,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:50:24"
+            },
+            {
+                "track_id": 6,
+                "material": "Metal",
+                "is_metal": true,
+                "timestamp": "2026-09-07 14:50:27"
+            },
+            {
+                "track_id": 11,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:50:41"
+            },
+            {
+                "track_id": 13,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:50:48"
+            },
+            {
+                "track_id": 14,
+                "material": "Glass",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:50:56"
+            },
+            {
+                "track_id": 16,
+                "material": "Leather",
+                "is_metal": false,
+                "timestamp": "2026-09-07 14:51:04"
+            }
+        ]
+    }
+]

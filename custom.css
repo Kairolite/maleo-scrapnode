@@ -1,0 +1,75 @@
+/* Off-white Cream Background */
+.stApp {
+    background-color: #FBFBFB !important;
+    color: #1A1A1A !important;
+}
+
+/* Page Layout Optimization */
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+    max-width: 100% !important;
+}
+
+/* Hide Default Header/Footer */
+#MainMenu, footer, header {
+    visibility: hidden;
+}
+
+/* Custom Action Buttons using Accent #98C5B2 */
+.stButton > button {
+    width: 100%;
+    height: 3.2rem;
+    font-size: 1.1rem !important;
+    font-weight: 600;
+    border-radius: 8px;
+    background-color: #98C5B2 !important;
+    color: #1A1A1A !important;
+    border: none !important;
+}
+
+.stButton > button:hover {
+    background-color: #83b29e !important;
+    color: #1A1A1A !important;
+}
+
+/* Helper for side-by-side action buttons */
+div[data-testid="column"] .stButton > button {
+    margin-bottom: 0.5rem;
+}
+
+/* Common Inactive Placeholder Box Base */
+.placeholder-box-offline {
+    width: 100%;
+    height: 380px;
+    background-color: #F1F5F9;
+    border: 2px dashed #98C5B2;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Custom Segmented Control Nav Styling */
+[data-baseweb="segmented-control"] {
+    background-color: #E2E8F0 !important;
+    border-radius: 8px !important;
+    padding: 4px !important;
+}
+
+[data-baseweb="segmented-control"] button {
+    border-radius: 6px !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+}
+
+[data-baseweb="segmented-control"] button[aria-selected="true"] {
+    background-color: #98C5B2 !important;
+    color: #1A1A1A !important;
+}
