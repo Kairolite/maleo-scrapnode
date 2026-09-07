@@ -1,10 +1,11 @@
 import json
 import os
 from datetime import datetime
+import av
 import cv2
-import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit_webrtc import WebRtcMode, webrtc_streamer
 from ultralytics import YOLO
 
 # 1. Page Configuration
@@ -53,6 +54,8 @@ if "recorded_session_logs" not in st.session_state:
     st.session_state.recorded_session_logs = []
 if "live_logs_display" not in st.session_state:
     st.session_state.live_logs_display = []
+if "logged_object_ids" not in st.session_state:
+    st.session_state.logged_object_ids = set()
 
 
 # Helper to auto-save scan records to JSON
@@ -87,6 +90,7 @@ def auto_save_to_json():
         )
 
         st.session_state.recorded_session_logs = []
+        st.session_state.logged_object_ids = set()
 
 
 # 4. Header & Top Navigation
@@ -104,7 +108,7 @@ st.session_state.current_tab = current_tab
 st.markdown("---")
 
 # ==========================================
-# MENU 1: SORTING (MOBILE BROWSER SCANNER)
+# MENU 1: SORTING (REAL-TIME WEBRTC STREAM)
 # ==========================================
 if current_tab == "Sorting":
     col_video, col_side = st.columns([3, 2])
@@ -113,11 +117,11 @@ if current_tab == "Sorting":
         st.subheader("Controls & Live Audit")
         conf_thresh = st.slider("Confidence Threshold", 0.1, 1.0, 0.4, 0.05)
 
-        if st.button("💾 Save Session Data to JSON"):
+        if st.button("💾 Save Recorded Session to JSON"):
             auto_save_to_json()
             st.rerun()
 
-        st.subheader("Recent Material Scans")
+        st.subheader("Live Unique Materials Stream")
         log_table_placeholder = st.empty()
 
         if st.session_state.live_logs_display:
@@ -129,9 +133,9 @@ if current_tab == "Sorting":
             log_table_placeholder.markdown(
                 """
                 <div class="placeholder-box-offline" style="height: 200px;">
-                    <div>📋 FEED LOG EMPTY</div>
+                    <div>📋 FEED LOG INACTIVE</div>
                     <div style="font-size: 0.85rem; margin-top: 6px; color: #64748B;">
-                        Capture a snapshot to record materials
+                        Start the live stream to begin auto-logging materials
                     </div>
                 </div>
                 """,
@@ -141,32 +145,31 @@ if current_tab == "Sorting":
     with col_video:
         st.subheader("Webcam Viewfinder")
 
-        # Browser Native Camera Widget
-        camera_photo = st.camera_input("Scan Scrap Material")
+        # Frame Processing Callback Function
+        def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+            img = frame.to_ndarray(format="bgr24")
 
-        if camera_photo is not None:
-            # Convert image buffer from browser into OpenCV BGR format
-            bytes_data = camera_photo.getvalue()
-            frame = cv2.imdecode(
-                np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR
-            )
-
-            # Run YOLO Prediction
-            results = model.predict(
-                source=frame, conf=conf_thresh, verbose=False
+            # Run YOLO Multi-Object Tracking
+            results = model.track(
+                source=img, conf=conf_thresh, persist=True, verbose=False
             )
             annotated_frame = results[0].plot()
 
-            detected_names = [
-                model.names[int(box.cls[0])] for box in results[0].boxes
-            ]
-            timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            time_display = datetime.now().strftime("%H:%M:%S")
-
             metal_detected = False
 
-            if detected_names:
-                for obj_name in detected_names:
+            if (
+                results[0].boxes is not None
+                and results[0].boxes.id is not None
+            ):
+                track_ids = results[0].boxes.id.int().cpu().tolist()
+                class_indices = results[0].boxes.cls.int().cpu().tolist()
+
+                timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                time_display = datetime.now().strftime("%H:%M:%S")
+
+                for track_id, class_idx in zip(track_ids, class_indices):
+                    obj_name = model.names[class_idx]
+
                     is_obj_metal = (
                         obj_name.lower() in [m.lower() for m in METAL_CLASSES]
                         or "metal" in obj_name.lower()
@@ -174,25 +177,34 @@ if current_tab == "Sorting":
                     if is_obj_metal:
                         metal_detected = True
 
-                    # Record item entry
-                    item_entry = {
-                        "material": obj_name,
-                        "is_metal": is_obj_metal,
-                        "timestamp": timestamp_str,
-                    }
-                    st.session_state.recorded_session_logs.append(item_entry)
+                    # Check for unique track ID
+                    if track_id not in st.session_state.logged_object_ids:
+                        st.session_state.logged_object_ids.add(track_id)
 
-                    st.session_state.live_logs_display.insert(
-                        0,
-                        {
-                            "Time": time_display,
-                            "Material": obj_name,
-                            "Type": "⚡ Metal" if is_obj_metal else "Other",
-                        },
-                    )
-                    st.session_state.live_logs_display = (
-                        st.session_state.live_logs_display[:8]
-                    )
+                        item_entry = {
+                            "track_id": track_id,
+                            "material": obj_name,
+                            "is_metal": is_obj_metal,
+                            "timestamp": timestamp_str,
+                        }
+                        st.session_state.recorded_session_logs.append(
+                            item_entry
+                        )
+
+                        st.session_state.live_logs_display.insert(
+                            0,
+                            {
+                                "ID": f"#{track_id}",
+                                "Time": time_display,
+                                "Material": obj_name,
+                                "Type": (
+                                    "⚡ Metal" if is_obj_metal else "Other"
+                                ),
+                            },
+                        )
+                        st.session_state.live_logs_display = (
+                            st.session_state.live_logs_display[:8]
+                        )
 
             if metal_detected:
                 cv2.putText(
@@ -205,20 +217,25 @@ if current_tab == "Sorting":
                     3,
                 )
 
-            # Display Annotated Image Stream Result
-            rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-            st.image(
-                rgb_frame,
-                caption="Inference Result",
-                use_container_width=True,
-            )
+            return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
 
-            # Refresh table display
-            if st.session_state.live_logs_display:
-                df_logs = pd.DataFrame(st.session_state.live_logs_display)
-                log_table_placeholder.dataframe(
-                    df_logs, use_container_width=True, hide_index=True
-                )
+        # Streamlit WebRTC Component
+        webrtc_ctx = webrtc_streamer(
+            key="scrapnode-live-stream",
+            mode=WebRtcMode.SENDRECV,
+            video_frame_callback=video_frame_callback,
+            media_stream_constraints={"video": True, "audio": False},
+            rtc_configuration={
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            },
+        )
+
+        # Refresh UI log table when streamer is actively running
+        if webrtc_ctx.state.playing and st.session_state.live_logs_display:
+            df_logs = pd.DataFrame(st.session_state.live_logs_display)
+            log_table_placeholder.dataframe(
+                df_logs, use_container_width=True, hide_index=True
+            )
 
 # ==========================================
 # MENU 2: DATABASE & VISUALIZATION
