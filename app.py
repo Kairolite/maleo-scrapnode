@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 import cv2
+import numpy as np
 import pandas as pd
 import streamlit as st
 from ultralytics import YOLO
@@ -13,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Load Light Theme Styles
+# Load Custom Theme
 if os.path.exists("custom.css"):
     with open("custom.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -46,21 +47,15 @@ METAL_CLASSES = [
 ]
 
 # 3. Session State Setup
-if "camera_active" not in st.session_state:
-    st.session_state.camera_active = False
-if "mirror_camera" not in st.session_state:
-    st.session_state.mirror_camera = False
 if "current_tab" not in st.session_state:
     st.session_state.current_tab = "Sorting"
 if "recorded_session_logs" not in st.session_state:
     st.session_state.recorded_session_logs = []
 if "live_logs_display" not in st.session_state:
     st.session_state.live_logs_display = []
-if "logged_object_ids" not in st.session_state:
-    st.session_state.logged_object_ids = set()
 
 
-# Helper to save session log automatically
+# Helper to auto-save scan records to JSON
 def auto_save_to_json():
     if st.session_state.recorded_session_logs:
         log_file = "audit_logs.json"
@@ -92,83 +87,51 @@ def auto_save_to_json():
         )
 
         st.session_state.recorded_session_logs = []
-        st.session_state.logged_object_ids = set()
 
 
-# 4. Header & Navigation Lock Logic
+# 4. Header & Top Navigation
 st.title("🐦 Maleo ScrapNode - Material & Quality Scanner")
-
-nav_disabled = st.session_state.camera_active
 
 current_tab = st.radio(
     "Navigation",
     ["Sorting", "Database"],
     index=0 if st.session_state.current_tab == "Sorting" else 1,
     horizontal=True,
-    disabled=nav_disabled,
     label_visibility="collapsed",
 )
 
-if not nav_disabled:
-    st.session_state.current_tab = current_tab
-
-if st.session_state.camera_active:
-    st.warning(
-        "🔒 **Navigation Locked**: Stop the live camera feed before accessing the Database dashboard."
-    )
-
+st.session_state.current_tab = current_tab
 st.markdown("---")
 
 # ==========================================
-# MENU 1: SORTING (LIVE SCANNER)
+# MENU 1: SORTING (MOBILE BROWSER SCANNER)
 # ==========================================
 if current_tab == "Sorting":
     col_video, col_side = st.columns([3, 2])
 
     with col_side:
         st.subheader("Controls & Live Audit")
-
-        # Side-by-side Camera Action & Mirror Buttons
-        col_btn1, col_btn2 = st.columns(2)
-
-        with col_btn1:
-            if not st.session_state.camera_active:
-                if st.button("▶️ Activate Camera"):
-                    st.session_state.recorded_session_logs = []
-                    st.session_state.live_logs_display = []
-                    st.session_state.logged_object_ids = set()
-                    st.session_state.camera_active = True
-                    st.rerun()
-            else:
-                if st.button("⏹️ Stop Camera"):
-                    st.session_state.camera_active = False
-                    auto_save_to_json()
-                    st.rerun()
-
-        with col_btn2:
-            mirror_label = (
-                "🪞 Mirror: ON"
-                if st.session_state.mirror_camera
-                else "🪞 Mirror: OFF"
-            )
-            if st.button(mirror_label):
-                st.session_state.mirror_camera = (
-                    not st.session_state.mirror_camera
-                )
-                st.rerun()
-
         conf_thresh = st.slider("Confidence Threshold", 0.1, 1.0, 0.4, 0.05)
 
-        st.subheader("Live Unique Materials Stream")
+        if st.button("💾 Save Session Data to JSON"):
+            auto_save_to_json()
+            st.rerun()
+
+        st.subheader("Recent Material Scans")
         log_table_placeholder = st.empty()
 
-        if not st.session_state.camera_active:
+        if st.session_state.live_logs_display:
+            df_logs = pd.DataFrame(st.session_state.live_logs_display)
+            log_table_placeholder.dataframe(
+                df_logs, use_container_width=True, hide_index=True
+            )
+        else:
             log_table_placeholder.markdown(
                 """
-                <div class="placeholder-box-offline" style="height: 250px;">
-                    <div>📋 FEED LOG INACTIVE</div>
+                <div class="placeholder-box-offline" style="height: 200px;">
+                    <div>📋 FEED LOG EMPTY</div>
                     <div style="font-size: 0.85rem; margin-top: 6px; color: #64748B;">
-                        Start stream to track unique material object IDs
+                        Capture a snapshot to record materials
                     </div>
                 </div>
                 """,
@@ -177,120 +140,85 @@ if current_tab == "Sorting":
 
     with col_video:
         st.subheader("Webcam Viewfinder")
-        video_placeholder = st.empty()
 
-        if not st.session_state.camera_active:
-            video_placeholder.markdown(
-                """
-                <div class="placeholder-box-offline">
-                    <div>📷 CAMERA OFFLINE</div>
-                    <div style="font-size: 0.9rem; margin-top: 8px; color: #64748B;">
-                        Tap "Activate Camera" to start live feed
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+        # Browser Native Camera Widget
+        camera_photo = st.camera_input("Scan Scrap Material")
+
+        if camera_photo is not None:
+            # Convert image buffer from browser into OpenCV BGR format
+            bytes_data = camera_photo.getvalue()
+            frame = cv2.imdecode(
+                np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR
             )
 
-    # OpenCV Live Loop
-    if st.session_state.camera_active:
-        cap = cv2.VideoCapture(0)
+            # Run YOLO Prediction
+            results = model.predict(
+                source=frame, conf=conf_thresh, verbose=False
+            )
+            annotated_frame = results[0].plot()
 
-        try:
-            while st.session_state.camera_active:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Camera connection lost.")
-                    st.session_state.camera_active = False
-                    auto_save_to_json()
-                    break
+            detected_names = [
+                model.names[int(box.cls[0])] for box in results[0].boxes
+            ]
+            timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            time_display = datetime.now().strftime("%H:%M:%S")
 
-                # Apply camera mirroring if enabled
-                if st.session_state.mirror_camera:
-                    frame = cv2.flip(frame, 1)
+            metal_detected = False
 
-                results = model.track(
-                    source=frame, conf=conf_thresh, persist=True, verbose=False
-                )
-                annotated_frame = results[0].plot()
-
-                metal_detected = False
-
-                if (
-                    results[0].boxes is not None
-                    and results[0].boxes.id is not None
-                ):
-                    track_ids = results[0].boxes.id.int().cpu().tolist()
-                    class_indices = results[0].boxes.cls.int().cpu().tolist()
-
-                    timestamp_str = datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
+            if detected_names:
+                for obj_name in detected_names:
+                    is_obj_metal = (
+                        obj_name.lower() in [m.lower() for m in METAL_CLASSES]
+                        or "metal" in obj_name.lower()
                     )
-                    time_display = datetime.now().strftime("%H:%M:%S")
+                    if is_obj_metal:
+                        metal_detected = True
 
-                    for track_id, class_idx in zip(track_ids, class_indices):
-                        obj_name = model.names[class_idx]
+                    # Record item entry
+                    item_entry = {
+                        "material": obj_name,
+                        "is_metal": is_obj_metal,
+                        "timestamp": timestamp_str,
+                    }
+                    st.session_state.recorded_session_logs.append(item_entry)
 
-                        is_obj_metal = (
-                            obj_name.lower()
-                            in [m.lower() for m in METAL_CLASSES]
-                            or "metal" in obj_name.lower()
-                        )
-                        if is_obj_metal:
-                            metal_detected = True
-
-                        if track_id not in st.session_state.logged_object_ids:
-                            st.session_state.logged_object_ids.add(track_id)
-
-                            item_entry = {
-                                "track_id": track_id,
-                                "material": obj_name,
-                                "is_metal": is_obj_metal,
-                                "timestamp": timestamp_str,
-                            }
-                            st.session_state.recorded_session_logs.append(
-                                item_entry
-                            )
-
-                            st.session_state.live_logs_display.insert(
-                                0,
-                                {
-                                    "ID": f"#{track_id}",
-                                    "Time": time_display,
-                                    "Material": obj_name,
-                                    "Type": (
-                                        "⚡ Metal" if is_obj_metal else "Other"
-                                    ),
-                                },
-                            )
-                            st.session_state.live_logs_display = (
-                                st.session_state.live_logs_display[:8]
-                            )
-
-                if metal_detected:
-                    cv2.putText(
-                        annotated_frame,
-                        "METAL DETECTED",
-                        (30, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 200, 100),
-                        3,
+                    st.session_state.live_logs_display.insert(
+                        0,
+                        {
+                            "Time": time_display,
+                            "Material": obj_name,
+                            "Type": "⚡ Metal" if is_obj_metal else "Other",
+                        },
+                    )
+                    st.session_state.live_logs_display = (
+                        st.session_state.live_logs_display[:8]
                     )
 
-                rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-                video_placeholder.image(
-                    rgb_frame, channels="RGB", use_container_width=True
+            if metal_detected:
+                cv2.putText(
+                    annotated_frame,
+                    "METAL DETECTED",
+                    (30, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 200, 100),
+                    3,
                 )
 
-                if st.session_state.live_logs_display:
-                    df_logs = pd.DataFrame(st.session_state.live_logs_display)
-                    log_table_placeholder.dataframe(
-                        df_logs, use_container_width=True, hide_index=True
-                    )
+            # Display Annotated Image Stream Result
+            rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+            st.image(
+                rgb_frame,
+                caption="Inference Result",
+                use_container_width=True,
+            )
 
-        finally:
-            cap.release()
+            # Refresh table display
+            if st.session_state.live_logs_display:
+                df_logs = pd.DataFrame(st.session_state.live_logs_display)
+                log_table_placeholder.dataframe(
+                    df_logs, use_container_width=True, hide_index=True
+                )
 
 # ==========================================
 # MENU 2: DATABASE & VISUALIZATION
@@ -312,7 +240,6 @@ elif current_tab == "Database":
         if not logs_data:
             st.warning("The log file is empty.")
         else:
-            # Summary Metrics
             total_sessions = len(logs_data)
             total_items = sum(
                 s.get("unique_items_logged", 0) for s in logs_data
@@ -326,12 +253,8 @@ elif current_tab == "Database":
 
             st.markdown("---")
 
-            # ----------------------------------------------------
-            # DATA VISUALIZATION: "Scrap Composition" Stacked Bar Chart
-            # ----------------------------------------------------
             st.subheader("📊 Scrap Composition")
 
-            # Prepare Data Frame for Charting
             chart_records = []
             all_materials = set()
 
@@ -347,7 +270,6 @@ elif current_tab == "Database":
             if chart_records:
                 df_chart_raw = pd.DataFrame(chart_records)
 
-                # Filter Controls
                 selected_materials = st.multiselect(
                     "Filter Materials to Include in Visualization:",
                     options=sorted(list(all_materials)),
@@ -355,28 +277,20 @@ elif current_tab == "Database":
                 )
 
                 if selected_materials:
-                    # Filter data based on selection
                     df_filtered = df_chart_raw[
                         df_chart_raw["Material"].isin(selected_materials)
                     ]
-
-                    # Group and pivot data into stacked matrix form: Index = Session, Columns = Materials
                     df_pivot = (
                         df_filtered.groupby(["Session", "Material"])
                         .size()
                         .unstack(fill_value=0)
                     )
-
-                    # Display Stacked Bar Chart
                     st.bar_chart(df_pivot, stack=True)
                 else:
-                    st.warning("Please select at least one material to display.")
-            else:
-                st.info("No material detection details available to display.")
+                    st.warning("Please select at least one material.")
 
             st.markdown("---")
 
-            # Inspect Individual Session Details
             session_options = [
                 f"Session {s.get('session_id', 'N/A')} ({s.get('unique_items_logged', 0)} items)"
                 for s in logs_data
@@ -388,7 +302,6 @@ elif current_tab == "Database":
             )
 
             selected_session = logs_data[selected_session_idx]
-
             st.markdown(
                 f"### Details for Session: `{selected_session.get('session_id')}`"
             )
@@ -399,8 +312,6 @@ elif current_tab == "Database":
                 st.dataframe(
                     df_session, use_container_width=True, hide_index=True
                 )
-            else:
-                st.write("No items detected in this session.")
 
             with st.expander("🔍 View Raw JSON File Data"):
                 st.json(logs_data)
